@@ -104,7 +104,7 @@ def ingest(workspace_id, name, filename, data):
             return store.decode(existing)
         did, vid = store.uid(), store.uid()
         db.execute("INSERT INTO datasets VALUES(?,?,?,?,?,?,?)", (did, workspace_id, name, str(normalized.relative_to(store.root())), store.dumps(schema), store.dumps(profile), profile["rows"]))
-        db.execute("INSERT INTO source_versions VALUES(?,?,?,?,?,?,?,?)", (vid, sid, did, sha, Path(filename).name, str(original.relative_to(store.root())), store.now()))
+        db.execute("INSERT INTO source_versions VALUES(?,?,?,?,?,?,?)", (vid, sid, did, sha, Path(filename).name, str(original.relative_to(store.root())), store.now()))
     return store.one("SELECT * FROM source_versions WHERE id=?", (vid,))
 
 
