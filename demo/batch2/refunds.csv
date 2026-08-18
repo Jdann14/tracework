@@ -1,0 +1,5 @@
+refund_id,order_id,amount_cents,currency,received_at
+R1,O002,2500,USD,2026-08-20
+R2,O004,4500,USD,2026-08-21
+R3,O003,9000,USD,2026-09-03
+R4,O999,1700,USD,2026-09-04

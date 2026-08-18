@@ -1,0 +1,6 @@
+spend_id,channel,currency,spend_cents
+S0,Paid search,USD,30000
+S1,Paid social,USD,22000
+S2,Email,USD,3500
+S3,Organic,USD,0
+S4,Affiliates,USD,4000
