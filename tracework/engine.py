@@ -1,4 +1,5 @@
 """Execution interface: SQL today; other engines can implement this protocol later."""
+
 from typing import Protocol
 import duckdb
 import pyarrow as pa
@@ -20,12 +21,18 @@ class ExecutionBackend(Protocol):
 class DuckDBBackend:
     def __init__(self, inputs, settings: Settings):
         self.settings = settings
-        self.con = duckdb.connect(config={
-            "memory_limit": f"{settings.memory_mb}MB", "threads": settings.threads,
-            "autoinstall_known_extensions": False, "autoload_known_extensions": False,
-            "allow_unsigned_extensions": False, "allow_community_extensions": False,
-            "temp_directory": "", "max_temp_directory_size": "0B",
-        })
+        self.con = duckdb.connect(
+            config={
+                "memory_limit": f"{settings.memory_mb}MB",
+                "threads": settings.threads,
+                "autoinstall_known_extensions": False,
+                "autoload_known_extensions": False,
+                "allow_unsigned_extensions": False,
+                "allow_community_extensions": False,
+                "temp_directory": "",
+                "max_temp_directory_size": "0B",
+            }
+        )
         # Trusted bootstrap only. Materialize approved inputs into memory before locking I/O.
         for name, source in inputs.items():
             table = pq.read_table(store.local_path(source["path"]))
@@ -49,7 +56,9 @@ class DuckDBBackend:
         for batch in result:
             rows += batch.num_rows
             if rows > self.settings.max_output_rows:
-                raise ValueError(f"Query exceeds {self.settings.max_output_rows:,} output rows; aggregate or filter it")
+                raise ValueError(
+                    f"Query exceeds {self.settings.max_output_rows:,} output rows; aggregate or filter it"
+                )
             batches.append(batch)
         return pa.Table.from_batches(batches, schema=result.schema)
 

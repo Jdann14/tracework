@@ -1,4 +1,5 @@
 """SQLite owns identities and transactions; immutable files own table data."""
+
 import hashlib
 import json
 import os
@@ -91,7 +92,9 @@ def transaction():
 def decode(row):
     if row is None:
         return None
-    return {k.removesuffix("_json"): json.loads(v) if k.endswith("_json") else v for k, v in dict(row).items()}
+    return {
+        k.removesuffix("_json"): json.loads(v) if k.endswith("_json") else v for k, v in dict(row).items()
+    }
 
 
 def all_rows(sql, args=()):
@@ -121,7 +124,10 @@ def create_workspace(name):
 
 
 def log(run_id, message, step=None):
-    execute("INSERT INTO logs(run_id,step,message,created_at) VALUES(?,?,?,?)", (run_id, step, safe_error(message), now()))
+    execute(
+        "INSERT INTO logs(run_id,step,message,created_at) VALUES(?,?,?,?)",
+        (run_id, step, safe_error(message), now()),
+    )
 
 
 def local_path(relative):

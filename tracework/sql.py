@@ -1,4 +1,5 @@
 """AST validation is defense in depth; DuckDB configuration is the I/O boundary."""
+
 import sqlglot
 from sqlglot import exp
 from sqlglot.optimizer.scope import traverse_scope
