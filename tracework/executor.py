@@ -1,5 +1,9 @@
 """Trusted executor child. It never receives provider credentials or executes Python from users."""
 
+import os
+import threading
+import time
+from decimal import Decimal
 import resource
 import sys
 import pyarrow.parquet as pq
@@ -11,6 +15,18 @@ from .pipelines import resolve_inputs, version
 from .sql import order_steps
 
 
+def watch_parent():
+    parent = os.getppid()
+
+    def watch():
+        while True:
+            time.sleep(1)
+            if os.getppid() != parent:
+                os._exit(70)
+
+    threading.Thread(target=watch, daemon=True).start()
+
+
 def run_pipeline(run_id):
     run = store.one("SELECT * FROM runs WHERE id=?", (run_id,))
     settings = Settings.model_validate(run["settings"])
@@ -19,6 +35,7 @@ def run_pipeline(run_id):
     spec = PipelineSpec.model_validate(version(run["workspace_id"], run["version_id"])["spec"])
     inputs = resolve_inputs(run["workspace_id"], run["inputs"])
     current, engine = None, None
+    output = None
     try:
         for source in spec.sources:
             schema = {c["name"]: c["type"] for c in inputs[source.name]["schema"]}
@@ -28,6 +45,25 @@ def run_pipeline(run_id):
                 for k in source.columns
                 if k in schema and source.columns[k] != schema[k]
             }
+            violations = [
+                {"column": column, "expected": source.columns[column], "actual": schema.get(column)}
+                for column in sorted(missing | set(changed))
+            ]
+            store.execute(
+                "INSERT INTO checks VALUES(?,?,?,?,?,?,?,?,?,?)",
+                (
+                    store.uid(),
+                    run_id,
+                    "__inputs__",
+                    f"Source contract: {source.name}",
+                    "blocking",
+                    "failed" if violations else "passed",
+                    len(violations),
+                    "-- Schema contract checked before SQL execution",
+                    store.dumps(violations),
+                    None,
+                ),
+            )
             if missing or changed:
                 raise ValueError(
                     f"Source contract failed for {source.name}: missing columns {sorted(missing)}; changed types {changed}. Map a compatible source version or explicitly revise the recipe."
@@ -48,7 +84,27 @@ def run_pipeline(run_id):
             artifact_id = save_artifact(run, current, table)
             failed = False
             for check in step.checks:
-                result = engine.query(check.sql, set(step.depends_on) | {current}, run["parameters"])
+                try:
+                    result = engine.query(check.sql, set(step.depends_on) | {current}, run["parameters"])
+                except Exception as exc:
+                    store.execute(
+                        "INSERT INTO checks VALUES(?,?,?,?,?,?,?,?,?,?)",
+                        (
+                            store.uid(),
+                            run_id,
+                            current,
+                            check.name,
+                            check.severity,
+                            "error",
+                            None,
+                            check.sql,
+                            "[]",
+                            store.safe_error(exc),
+                        ),
+                    )
+                    raise ValueError(
+                        f"Check {check.name} could not execute: {store.safe_error(exc)}"
+                    ) from exc
                 n = result.num_rows
                 status = "passed" if n == 0 else "failed"
                 store.execute(
@@ -78,11 +134,14 @@ def run_pipeline(run_id):
             )
             store.log(run_id, f"Materialized {table.num_rows:,} rows", current)
             if current == spec.output:
-                create_finding(run_id, artifact_id, table, current)
-        store.execute(
-            "UPDATE runs SET status='successful',finished_at=? WHERE id=? AND status='running'",
-            (store.now(), run_id),
-        )
+                output = (artifact_id, table, current)
+        with store.transaction() as db:
+            active = db.execute("SELECT status,cancel_requested FROM runs WHERE id=?", (run_id,)).fetchone()
+            if active["status"] != "running" or active["cancel_requested"]:
+                raise ValueError("Run cancelled or lease lost before completion")
+            if output:
+                create_finding(run_id, *output, db=db)
+            db.execute("UPDATE runs SET status='successful',finished_at=? WHERE id=?", (store.now(), run_id))
         store.log(run_id, "Run completed. Findings link to the executed output.")
     except Exception as exc:
         error = store.safe_error(exc)
@@ -95,9 +154,10 @@ def run_pipeline(run_id):
             "UPDATE step_executions SET status='skipped',finished_at=? WHERE run_id=? AND status='queued'",
             (store.now(), run_id),
         )
+        cancelled = store.one("SELECT cancel_requested FROM runs WHERE id=?", (run_id,))["cancel_requested"]
         store.execute(
-            "UPDATE runs SET status='failed',error=?,finished_at=? WHERE id=? AND status='running'",
-            (error, store.now(), run_id),
+            "UPDATE runs SET status=?,error=?,finished_at=? WHERE id=? AND status='running'",
+            ("cancelled" if cancelled else "failed", error, store.now(), run_id),
         )
         store.log(run_id, error, current)
     finally:
@@ -134,7 +194,7 @@ def save_artifact(run, step, table):
     return aid
 
 
-def create_finding(run_id, artifact_id, table, step):
+def create_finding(run_id, artifact_id, table, step, db=None):
     if not table.num_rows:
         title, detail, evidence = (
             "The query returned no rows",
@@ -142,21 +202,29 @@ def create_finding(run_id, artifact_id, table, step):
             {"step": step, "row_count": 0},
         )
     else:
-        row = table.slice(0, 1).to_pylist()[0]
-        if "channel" in row and "contribution_profit" in row:
-            title = f"{row['channel']} leads contribution profit"
-            detail = f"{row['currency']} {row['contribution_profit']:,.2f} after product costs, refunds and advertising. Ranked by the saved SQL."
+        rows = table.to_pylist()
+        row, row_index = rows[0], 0
+        is_profit = all({"channel", "contribution_profit", "currency"} <= r.keys() for r in rows)
+        if (
+            is_profit
+            and len({r["currency"] for r in rows}) == 1
+            and all(isinstance(r["contribution_profit"], (int, float, Decimal)) for r in rows)
+        ):
+            row_index, row = max(enumerate(rows), key=lambda item: item[1]["contribution_profit"])
+            title = f"{row['channel']} has the highest reported contribution profit"
+            detail = f"{row['currency']} {row['contribution_profit']:,.2f}. Maximum verified across all {table.num_rows} output rows; see the saved SQL and assumptions for the calculation."
         else:
             title, detail = (
                 "Query result is ready",
                 f"{table.num_rows:,} output rows. Inspect the query and data before interpreting the result.",
             )
-        evidence = {"step": step, "row_index": 0, "row": row}
-    store.execute(
+        evidence = {"step": step, "row_index": row_index, "row": row}
+    (db.execute if db else store.execute)(
         "INSERT INTO findings VALUES(?,?,?,?,?,?)",
         (store.uid(), run_id, artifact_id, title, detail, store.dumps(evidence)),
     )
 
 
 if __name__ == "__main__":
+    watch_parent()
     run_pipeline(sys.argv[1])

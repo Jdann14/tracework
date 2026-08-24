@@ -61,9 +61,17 @@ CREATE TRIGGER IF NOT EXISTS immutable_pipelines BEFORE UPDATE ON pipeline_versi
 """
 
 
+class ClosingConnection(sqlite3.Connection):
+    def __exit__(self, *args):
+        try:
+            return super().__exit__(*args)
+        finally:
+            self.close()
+
+
 def connect():
     root().mkdir(parents=True, exist_ok=True)
-    db = sqlite3.connect(root() / "metadata.sqlite", timeout=15)
+    db = sqlite3.connect(root() / "metadata.sqlite", timeout=15, factory=ClosingConnection)
     db.row_factory = sqlite3.Row
     db.execute("PRAGMA foreign_keys=ON")
     db.execute("PRAGMA journal_mode=WAL")

@@ -193,6 +193,23 @@ def tool_schema(name, description, properties, required=None):
     }
 
 
+def inline_schema():
+    """Pydantic refs are root-relative; inline them before nesting inside a tool."""
+    schema = PipelineSpec.model_json_schema()
+    definitions = schema.pop("$defs", {})
+
+    def expand(value):
+        if isinstance(value, dict):
+            if "$ref" in value:
+                return expand(definitions[value["$ref"].split("/")[-1]])
+            return {key: expand(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [expand(item) for item in value]
+        return value
+
+    return expand(schema)
+
+
 def tools_schema():
     string = {"type": "string"}
     return [
@@ -208,12 +225,12 @@ def tools_schema():
         tool_schema(
             "propose_pipeline",
             "Propose a validated pipeline for user approval",
-            {"spec": PipelineSpec.model_json_schema()},
+            {"spec": inline_schema()},
         ),
         tool_schema(
             "propose_revision",
             "Propose a new immutable version of the supplied base",
-            {"spec": PipelineSpec.model_json_schema()},
+            {"spec": inline_schema()},
         ),
         tool_schema(
             "request_clarification", "Ask for absent data or a business definition", {"question": string}
@@ -231,7 +248,16 @@ class OpenAIAdapter:
         key, model = os.environ.get("OPENAI_API_KEY"), os.environ.get("OPENAI_MODEL")
         if not key or not model:
             raise ValueError("Set OPENAI_API_KEY and OPENAI_MODEL to use the real provider")
-        history = [{"role": "user", "content": tools.job["question"]}]
+        history = []
+        previous = store.all_rows(
+            "SELECT question,message FROM investigations WHERE workspace_id=? AND created_at<? ORDER BY created_at DESC LIMIT 4",
+            (tools.workspace_id, tools.job["created_at"]),
+        )
+        for item in reversed(previous):
+            history.append({"role": "user", "content": item["question"]})
+            if item["message"]:
+                history.append({"role": "assistant", "content": item["message"]})
+        history.append({"role": "user", "content": tools.job["question"]})
         if tools.job.get("base_version_id"):
             history.append(
                 {
@@ -329,6 +355,16 @@ class DemoAdapter:
             "explore_sql", {"sql": "SELECT currency,count(*) AS rows FROM orders GROUP BY currency LIMIT 100"}
         )
         if recovery:
+            base = version(tools.workspace_id, tools.job["base_version_id"])
+            expected_base = commerce_spec(tools.workspace_id, False).model_dump()
+            if base["spec"]["steps"] != expected_base["steps"]:
+                tools.call(
+                    "request_clarification",
+                    {
+                        "question": "This recipe differs from the original deterministic demo. Edit it directly or enable the real provider to preserve your custom changes during revision."
+                    },
+                )
+                return
             if tools.job.get("failed_run_id"):
                 tools.call("inspect_execution_error", {"run_id": tools.job["failed_run_id"]})
             if not any(s in question for s in ("repair", "recover", "duplicate", "spend_cents", "fix")):

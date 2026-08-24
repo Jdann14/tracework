@@ -76,7 +76,7 @@ def test_duplicates_block_with_preserved_artifact(workspace):
     once()
     result = get_run(workspace, run["id"])
     assert result["status"] == "failed"
-    assert result["checks"][0]["violations"] == 1
+    assert next(c for c in result["checks"] if c["name"] == "Unique orders")["violations"] == 1
     assert result["artifacts"] and not result["findings"]
 
 

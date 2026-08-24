@@ -89,7 +89,7 @@ def supervise(job, table="runs"):
                 break
             if row["status"] != "running":
                 # A recovered stale job must never continue writing as a successful run.
-                if row["status"] not in ("successful", "completed", "clarification", "proposed", "failed"):
+                if row["status"] not in ("successful", "completed", "clarification", "proposed"):
                     reason = "Job is no longer active"
                     break
             if time.monotonic() - started > timeout:
@@ -128,6 +128,11 @@ def once():
 
 def main():
     import fcntl
+
+    def shutdown(signum, frame):
+        raise KeyboardInterrupt
+
+    signal.signal(signal.SIGTERM, shutdown)
 
     store.init()
     lock = (store.root() / "worker.lock").open("w")
