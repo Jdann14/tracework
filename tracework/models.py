@@ -88,6 +88,8 @@ class PipelineVersion(StrictModel):
 
 
 class Settings(StrictModel):
+    engine: Literal["duckdb"] = "duckdb"
+    engine_version: str = ""
     timeout_seconds: int = Field(default=45, ge=1, le=120)
     memory_mb: int = Field(default=512, ge=64, le=1024)
     max_output_rows: int = Field(default=100000, ge=1, le=1000000)

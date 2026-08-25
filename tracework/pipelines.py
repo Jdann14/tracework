@@ -1,3 +1,4 @@
+import duckdb
 from . import store
 from .models import PipelineSpec, RunRequest
 from .sql import order_steps
@@ -56,6 +57,7 @@ def resolve_inputs(workspace_id, inputs):
 
 
 def enqueue(workspace_id, request: RunRequest):
+    request.settings.engine_version = duckdb.__version__
     ver = version(workspace_id, request.version_id)
     if not ver["approved"]:
         raise ValueError("Approve this exact pipeline version before running")
@@ -116,5 +118,10 @@ def get_run(workspace_id, run_id):
         (run_id,),
     )
     run["version"] = version(workspace_id, run["version_id"])
+    positions = {
+        step.name: index
+        for index, step in enumerate(order_steps(PipelineSpec.model_validate(run["version"]["spec"])))
+    }
+    run["steps"].sort(key=lambda item: positions[item["name"]])
     run["resolved_inputs"] = resolve_inputs(workspace_id, run["inputs"])
     return run

@@ -6,6 +6,7 @@ import time
 from decimal import Decimal
 import resource
 import sys
+import duckdb
 import pyarrow.parquet as pq
 from . import store
 from .engine import DuckDBBackend
@@ -37,6 +38,10 @@ def run_pipeline(run_id):
     current, engine = None, None
     output = None
     try:
+        if settings.engine_version and settings.engine_version != duckdb.__version__:
+            raise ValueError(
+                "DuckDB version changed after this run was queued; queue a new execution with current settings"
+            )
         for source in spec.sources:
             schema = {c["name"]: c["type"] for c in inputs[source.name]["schema"]}
             missing = set(source.columns) - set(schema)

@@ -181,6 +181,16 @@ def run_detail(wid: str, rid: str):
     return get_run(wid, rid)
 
 
+@app.get("/api/workspaces/{wid}/runs/{rid}/manifest")
+def run_manifest(wid: str, rid: str):
+    record = get_run(wid, rid)
+    return Response(
+        store.dumps(record),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="tracework-run-{rid}.json"'},
+    )
+
+
 @app.post("/api/workspaces/{wid}/runs/{rid}/cancel")
 def cancel(wid: str, rid: str):
     current = get_run(wid, rid)
