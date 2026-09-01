@@ -19,6 +19,19 @@ def identifier(name):
     return '"' + name.replace('"', '""') + '"'
 
 
+def preview_rows(table, limit=30):
+    def bounded(value):
+        if isinstance(value, str) and len(value) > 2000:
+            return value[:2000] + "… [preview truncated]"
+        if isinstance(value, dict):
+            return {key: bounded(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [bounded(item) for item in value[:50]]
+        return value
+
+    return [bounded(row) for row in table.slice(0, limit).to_pylist()]
+
+
 def profile_table(table):
     con = duckdb.connect(config={"memory_limit": "256MB", "threads": 2})
     con.register("data", table)
@@ -44,7 +57,7 @@ def profile_table(table):
             }
         )
     con.close()
-    return {"rows": table.num_rows, "columns": columns, "sample": table.slice(0, 30).to_pylist()}
+    return {"rows": table.num_rows, "columns": columns, "sample": preview_rows(table)}
 
 
 def normalize(source, target):

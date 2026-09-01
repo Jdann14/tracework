@@ -14,10 +14,11 @@ from pydantic import Field
 from . import store
 from .compare import compare_runs
 from .demo import load_batch
-from .ingest import MAX_BYTES, ingest, sources
+from .ingest import MAX_BYTES, ingest, sources, preview_rows
 from .models import StrictModel, PipelineSpec, RunRequest
 from .pipelines import version, create_version, approve, enqueue, get_run
 from .worker import finish_run
+from .http_limits import BodyLimitMiddleware
 
 
 @asynccontextmanager
@@ -138,7 +139,12 @@ def dataset(wid: str, did: str, offset: int = Query(0, ge=0), limit: int = Query
         raise LookupError("Dataset not found")
     table = pq.read_table(store.local_path(record["path"]))
     record.pop("path")
-    return {**record, "data": table.slice(offset, limit).to_pylist(), "offset": offset, "limit": limit}
+    return {
+        **record,
+        "data": preview_rows(table.slice(offset, limit), limit),
+        "offset": offset,
+        "limit": limit,
+    }
 
 
 @app.get("/api/workspaces/{wid}/datasets/{did}/download")
@@ -244,3 +250,5 @@ def demo_batch(wid: str, batch: int):
 static = Path(__file__).resolve().parent.parent / "web" / "dist"
 if static.exists():
     app.mount("/", StaticFiles(directory=static, html=True), name="web")
+
+app.add_middleware(BodyLimitMiddleware, limit=MAX_BYTES + 128 * 1024)

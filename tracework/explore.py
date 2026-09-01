@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 from . import store
 from .engine import DuckDBBackend
+from .ingest import preview_rows
 from .models import Settings
 from .pipelines import resolve_inputs
 
@@ -18,7 +19,7 @@ def main(path):
     try:
         table = engine.query(request["sql"], set(inputs), {})
         output = {
-            "rows": table.to_pylist(),
+            "rows": preview_rows(table, 100),
             "columns": table.column_names,
             "input_versions": request["inputs"],
             "sql": request["sql"],
