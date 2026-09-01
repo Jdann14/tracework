@@ -1,3 +1,4 @@
+import PipelineGraph from "./PipelineGraph";
 import { useCallback, useEffect, useState, useRef } from "react";
 import {
   ArrowUp,
@@ -576,55 +577,12 @@ export default function App() {
                             </button>
                           ))}
                         </div>
-                        <div className="pipeline-flow">
-                          {version.spec.steps.map((step, i) => {
-                            const execution =
-                              run?.version_id === vid
-                                ? run.steps.find((s) => s.name === step.name)
-                                : undefined;
-                            return (
-                              <button
-                                key={step.name}
-                                className={
-                                  "step-node " +
-                                  (selectedStep === step.name ? "selected" : "")
-                                }
-                                onClick={() => setSelectedStep(step.name)}
-                              >
-                                <span
-                                  className={
-                                    "step-number " + (execution?.status || "")
-                                  }
-                                >
-                                  {execution?.status === "successful" ? (
-                                    <Check size={16} />
-                                  ) : (
-                                    i + 1
-                                  )}
-                                </span>
-                                <div>
-                                  <strong>{step.title}</strong>
-                                  <code>{step.name}</code>
-                                  <div className="dependencies">
-                                    {step.depends_on.map((d) => (
-                                      <span key={d}>{d}</span>
-                                    ))}
-                                  </div>
-                                </div>
-                                <span className="step-checks">
-                                  {execution ? (
-                                    <Status value={execution.status} />
-                                  ) : (
-                                    <>
-                                      {step.checks.length} checks
-                                      <ArrowUpRight size={14} />
-                                    </>
-                                  )}
-                                </span>
-                              </button>
-                            );
-                          })}
-                        </div>
+                        <PipelineGraph
+                          steps={version.spec.steps}
+                          selected={selectedStep}
+                          run={run?.version_id === vid ? run : undefined}
+                          onSelect={setSelectedStep}
+                        />
                         <details className="assumptions" open>
                           <summary>
                             Calculation & assumptions <ChevronDown size={14} />

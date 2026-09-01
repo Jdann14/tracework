@@ -2002,3 +2002,91 @@ td.numeric {
 .inspector .selected-step p {
   font-size: 10px;
 }
+
+.graph-scroll {
+  overflow-x: auto;
+  margin: 0 -5px;
+}
+.pipeline-graph {
+  position: relative;
+  min-width: 450px;
+  margin: 0 5px;
+}
+.pipeline-graph > svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.pipeline-graph path {
+  fill: none;
+  stroke: #ccd9bf;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+.pipeline-graph path.active-edge {
+  stroke: #6f9457;
+  stroke-width: 2;
+}
+.graph-node {
+  position: absolute;
+  transform: translateX(-50%);
+  height: 105px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: space-between;
+  text-align: left;
+  background: #fff;
+  box-shadow: 0 2px 5px #294b2610;
+  border-color: #dce6d2;
+  border-radius: 7px;
+  gap: 6px;
+}
+.graph-node.selected {
+  background: #f1f7e8;
+  border-color: #91b174;
+  box-shadow: 0 0 0 2px #d6e6c550;
+}
+.graph-node-head {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  align-items: center;
+  color: #8b9b7e;
+}
+.graph-node-head code {
+  font-size: 9px;
+}
+.graph-node-head > span {
+  font-size: 8px;
+}
+.graph-node-head .status {
+  font-size: 8px;
+}
+.graph-node strong {
+  font-size: 12px;
+  line-height: 1.4;
+  font-weight: 550;
+  max-width: 100%;
+  overflow: hidden;
+}
+.graph-inputs {
+  font-size: 8px;
+  color: #88997a;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  line-height: 1.4;
+  max-height: 23px;
+  overflow: hidden;
+}
+.graph-inputs span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.graph-inputs > svg {
+  flex-shrink: 0;
+}
