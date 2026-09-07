@@ -139,12 +139,18 @@ def dataset(wid: str, did: str, offset: int = Query(0, ge=0), limit: int = Query
         raise LookupError("Dataset not found")
     table = pq.read_table(store.local_path(record["path"]))
     record.pop("path")
-    return {
-        **record,
-        "data": preview_rows(table.slice(offset, limit), limit),
-        "offset": offset,
-        "limit": limit,
-    }
+    # Preserve Decimal values as strings: a JSON float can silently lose currency cents.
+    return Response(
+        store.dumps(
+            {
+                **record,
+                "data": preview_rows(table.slice(offset, limit), limit),
+                "offset": offset,
+                "limit": limit,
+            }
+        ),
+        media_type="application/json",
+    )
 
 
 @app.get("/api/workspaces/{wid}/datasets/{did}/download")

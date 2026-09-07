@@ -498,6 +498,30 @@ export function CompareView({ wid, runs }: { wid: string; runs: Run[] }) {
                   </p>
                 </>
               )}
+              {result.settings_changed && (
+                <p className="notice">
+                  Execution settings changed. Inspect the exact manifests before
+                  treating this as an input-only comparison.
+                </p>
+              )}
+              {JSON.stringify(result.assumptions_before) !==
+                JSON.stringify(result.assumptions_after) && (
+                <details className="change-card">
+                  <summary>Changed assumptions</summary>
+                  <h4>Before</h4>
+                  <ul>
+                    {result.assumptions_before.map((a) => (
+                      <li key={a}>{a}</li>
+                    ))}
+                  </ul>
+                  <h4>After</h4>
+                  <ul>
+                    {result.assumptions_after.map((a) => (
+                      <li key={a}>{a}</li>
+                    ))}
+                  </ul>
+                </details>
+              )}
               <h3>Source changes</h3>
               {result.input_changes.map((c) => (
                 <details key={c.source} className="change-card">

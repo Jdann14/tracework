@@ -164,6 +164,8 @@ export interface Comparison {
   step_changes: { step: string; before: Step; after: Step }[];
   parameters_changed: boolean;
   settings_changed: boolean;
+  assumptions_before: string[];
+  assumptions_after: string[];
   rows: {
     key: string;
     before: string;

@@ -23,15 +23,24 @@ children = []
 
 
 def stop(signum=None, frame=None):
+    raise KeyboardInterrupt
+
+
+def cleanup():
     for process in children:
         if process.poll() is None:
-            os.killpg(process.pid, signal.SIGTERM)
+            try:
+                os.killpg(process.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
     for process in children:
         try:
             process.wait(timeout=5)
         except subprocess.TimeoutExpired:
-            os.killpg(process.pid, signal.SIGKILL)
-    raise SystemExit(0)
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
 
 
 signal.signal(signal.SIGTERM, stop)
@@ -43,5 +52,8 @@ try:
     while all(p.poll() is None for p in children):
         time.sleep(0.5)
     print("A service exited; stopping the remaining services.", flush=True)
+    raise SystemExit(1)
+except KeyboardInterrupt:
+    pass
 finally:
-    stop()
+    cleanup()

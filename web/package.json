@@ -5,8 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 4318 --strictPort",
-    "build": "tsc -b && vite build",
-    "test:e2e": "playwright test"
+    "build": "tsc -b && vite build"
   },
   "dependencies": {
     "@fontsource/dm-sans": "^5.3.0",
@@ -16,7 +15,6 @@
     "react-dom": "^19.1.0"
   },
   "devDependencies": {
-    "@playwright/test": "^1.51.0",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "@vitejs/plugin-react": "^4.5.0",

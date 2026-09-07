@@ -141,9 +141,12 @@ def main():
     except BlockingIOError:
         raise SystemExit("Another Tracework worker is already active")
     print("Tracework worker ready", flush=True)
-    while True:
-        if not once():
-            time.sleep(0.5)
+    try:
+        while True:
+            if not once():
+                time.sleep(0.5)
+    except KeyboardInterrupt:
+        print("Tracework worker stopped", flush=True)
 
 
 if __name__ == "__main__":

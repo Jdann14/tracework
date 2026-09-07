@@ -148,3 +148,40 @@ def test_upload_sql_injection_remains_plain_data(workspace):
     assert store.local_path(uploaded["original_path"]).read_bytes() == original
     with pytest.raises(ValueError):
         ingest(workspace, "../escape", "x.csv", original)
+
+
+def test_cancel_running_query(workspace):
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+
+    plan = spec(
+        "WITH RECURSIVE forever(n) AS (SELECT 1 UNION ALL SELECT n+1 FROM forever) SELECT sum(n) FROM forever"
+    )
+    run, _, _ = queue(workspace, plan)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(once)
+        deadline = time.monotonic() + 8
+        while time.monotonic() < deadline:
+            step = store.one("SELECT status FROM step_executions WHERE run_id=?", (run["id"],))
+            if step["status"] == "running":
+                break
+            time.sleep(0.05)
+        else:
+            raise AssertionError("Query did not enter running state")
+        store.execute("UPDATE runs SET cancel_requested=1 WHERE id=?", (run["id"],))
+        future.result(timeout=5)
+    assert get_run(workspace, run["id"])["status"] == "cancelled"
+
+
+def test_mixed_currency_blocks(workspace):
+    from tracework.demo import batches, encode_csv
+
+    inputs = load_batch(workspace, 1)
+    rows = batches()["orders"]
+    rows[0]["currency"] = "EUR"
+    inputs["orders"] = ingest(workspace, "orders", "mixed.csv", encode_csv(rows))["id"]
+    ver = create_version(workspace, commerce_spec(workspace))
+    approve(workspace, ver["id"])
+    run = execute(workspace, ver["id"], inputs, "currency")
+    assert run["status"] == "failed"
+    assert any(c["name"] == "USD orders only" and c["violations"] == 1 for c in run["checks"])
