@@ -17,3 +17,12 @@ These dates are an explicit history experiment, not actual implementation dates.
 
 Each completed feature is committed before starting the next coherent slice.
 No external hosting: this is explicitly a local, single-user Python application.
+
+## Completion
+
+All eight planned slices are implemented and verified. The React interface uses
+an actual dependency graph, source and evidence previews, approval/mapping dialogs,
+version creation, worker progress, checks/logs and output comparisons. The final
+verification record lists 35 passing tests, the public API walkthrough, browser
+checks, restart/replay validation and explicit remaining limits. The real provider
+requires user-supplied credentials; the no-key adapter uses the same real engine.
